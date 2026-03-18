@@ -1,0 +1,19 @@
+# Environment
+.env
+__pycache__/
+*.pyc
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Temp
+*.wav
+*.mp3
+jarvis_history.json
