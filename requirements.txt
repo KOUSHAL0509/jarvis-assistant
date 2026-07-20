@@ -6,3 +6,4 @@ psutil
 openai
 python-dotenv
 pyautogui
+eel

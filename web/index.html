@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S — AI Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background particle canvas -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Top status bar -->
+    <header id="status-bar">
+        <div class="status-left">
+            <span class="status-dot"></span>
+            <span id="status-text">SYSTEM ONLINE</span>
+        </div>
+        <div class="status-center">
+            <span class="logo-text">J.A.R.V.I.S</span>
+        </div>
+        <div class="status-right">
+            <span id="clock"></span>
+            <span class="divider">|</span>
+            <span id="cpu-stat">CPU: ---%</span>
+            <span class="divider">|</span>
+            <span id="battery-stat">BAT: ---%</span>
+        </div>
+    </header>
+
+    <!-- Main container -->
+    <main id="app">
+        <!-- Left panel: Quick Actions -->
+        <aside id="actions-panel" class="glass-panel">
+            <h3 class="panel-title">QUICK ACTIONS</h3>
+            <div class="actions-grid">
+                <button class="action-btn" data-cmd="open youtube" id="btn-youtube">
+                    <div class="action-icon">▶</div>
+                    <span>YouTube</span>
+                </button>
+                <button class="action-btn" data-cmd="open google" id="btn-google">
+                    <div class="action-icon">G</div>
+                    <span>Google</span>
+                </button>
+                <button class="action-btn" data-cmd="open github" id="btn-github">
+                    <div class="action-icon">⟠</div>
+                    <span>GitHub</span>
+                </button>
+                <button class="action-btn" data-cmd="open chatgpt" id="btn-chatgpt">
+                    <div class="action-icon">◈</div>
+                    <span>ChatGPT</span>
+                </button>
+                <button class="action-btn" data-cmd="open chrome" id="btn-chrome">
+                    <div class="action-icon">◎</div>
+                    <span>Chrome</span>
+                </button>
+                <button class="action-btn" data-cmd="open notepad" id="btn-notepad">
+                    <div class="action-icon">📝</div>
+                    <span>Notepad</span>
+                </button>
+                <button class="action-btn" data-cmd="open calculator" id="btn-calc">
+                    <div class="action-icon">🔢</div>
+                    <span>Calc</span>
+                </button>
+                <button class="action-btn" data-cmd="open vs code" id="btn-vscode">
+                    <div class="action-icon">⟨⟩</div>
+                    <span>VS Code</span>
+                </button>
+                <button class="action-btn" data-cmd="open file explorer" id="btn-explorer">
+                    <div class="action-icon">📁</div>
+                    <span>Explorer</span>
+                </button>
+                <button class="action-btn" data-cmd="take screenshot" id="btn-screenshot">
+                    <div class="action-icon">📸</div>
+                    <span>Screenshot</span>
+                </button>
+                <button class="action-btn" data-cmd="system status" id="btn-system">
+                    <div class="action-icon">⚙</div>
+                    <span>System</span>
+                </button>
+                <button class="action-btn" data-cmd="clear history" id="btn-clear">
+                    <div class="action-icon">🗑</div>
+                    <span>Clear</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Center: Orb + Conversation -->
+        <section id="center-panel">
+            <!-- Jarvis Orb -->
+            <div id="orb-container">
+                <canvas id="orb-canvas" width="220" height="220"></canvas>
+                <div id="orb-label">IDLE</div>
+            </div>
+
+            <!-- Conversation log -->
+            <div id="conversation" class="glass-panel">
+                <div id="messages">
+                    <div class="message jarvis-msg">
+                        <span class="msg-sender">JARVIS</span>
+                        <span class="msg-text">Systems initialized. All modules online. How may I assist you, sir?</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input bar -->
+            <div id="input-bar" class="glass-panel">
+                <input type="text" id="text-input" placeholder="Type a command or press the mic..." autocomplete="off" spellcheck="false">
+                <button id="send-btn" title="Send">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+                </button>
+                <button id="mic-btn" title="Start Listening">
+                    <div class="mic-icon">🎤</div>
+                    <div class="mic-pulse"></div>
+                </button>
+            </div>
+        </section>
+
+        <!-- Right panel: Settings & Info -->
+        <aside id="info-panel" class="glass-panel">
+            <h3 class="panel-title">SYSTEM INFO</h3>
+            <div class="info-section">
+                <div class="info-row">
+                    <span class="info-label">Brain</span>
+                    <span class="info-value" id="brain-status">Checking...</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Voice</span>
+                    <span class="info-value">SAPI5</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Ears</span>
+                    <span class="info-value">Google SR</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Platform</span>
+                    <span class="info-value">Windows</span>
+                </div>
+            </div>
+
+            <h3 class="panel-title" style="margin-top: 24px;">SETTINGS</h3>
+            <div class="info-section">
+                <div class="setting-row">
+                    <span>Voice Output</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="voice-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <span>Auto-Listen</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="autolisten-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <h3 class="panel-title" style="margin-top: 24px;">VOICE COMMANDS</h3>
+            <div class="help-list">
+                <div class="help-item">"Open YouTube / Google"</div>
+                <div class="help-item">"Search [query]"</div>
+                <div class="help-item">"What time is it?"</div>
+                <div class="help-item">"System status"</div>
+                <div class="help-item">"Take screenshot"</div>
+                <div class="help-item">"Exit" / "Goodbye"</div>
+            </div>
+        </aside>
+    </main>
+
+    <script type="text/javascript" src="/eel.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
