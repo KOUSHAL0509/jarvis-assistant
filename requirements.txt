@@ -4,6 +4,8 @@ wikipedia
 PyAudio
 psutil
 openai
+requests
 python-dotenv
 pyautogui
 eel
+

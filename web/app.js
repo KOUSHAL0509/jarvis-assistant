@@ -206,7 +206,7 @@ updateClock();
 
 
 // ============================================================
-//  MESSAGES
+//  MESSAGES WITH RICH FORMATTING
 // ============================================================
 const messagesContainer = document.getElementById('messages');
 
@@ -214,9 +214,12 @@ function addMessage(sender, text) {
     const div = document.createElement('div');
     const isJarvis = sender.toLowerCase() === 'jarvis';
     div.className = `message ${isJarvis ? 'jarvis-msg' : 'user-msg'}`;
+    
+    const formattedContent = formatMessageText(text);
+
     div.innerHTML = `
         <span class="msg-sender">${sender.toUpperCase()}</span>
-        <span class="msg-text">${escapeHtml(text)}</span>
+        <div class="msg-text">${formattedContent}</div>
     `;
     messagesContainer.appendChild(div);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -226,6 +229,39 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function formatMessageText(text) {
+    if (!text) return '';
+
+    // First extract code blocks to protect them
+    const codeBlocks = [];
+    let placeholderText = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+        const idx = codeBlocks.length;
+        codeBlocks.push({ lang, code: escapeHtml(code.trim()) });
+        return `___CODE_BLOCK_${idx}___`;
+    });
+
+    // Escape HTML in the remaining text
+    let escaped = escapeHtml(placeholderText);
+
+    // Inline code: `code`
+    escaped = escaped.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+
+    // Bold: **text**
+    escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+    // Convert newlines to <br>
+    escaped = escaped.replace(/\n/g, '<br>');
+
+    // Restore code blocks
+    codeBlocks.forEach((item, idx) => {
+        const langBadge = item.lang ? `<span class="code-lang">${escapeHtml(item.lang.toUpperCase())}</span>` : '';
+        const blockHtml = `<div class="code-container">${langBadge}<pre class="code-block"><code>${item.code}</code></pre></div>`;
+        escaped = escaped.replace(`___CODE_BLOCK_${idx}___`, blockHtml);
+    });
+
+    return escaped;
 }
 
 // Expose to Python
@@ -245,15 +281,22 @@ function updateSystemBar(data) {
         document.getElementById('battery-stat').textContent = `BAT: ${data.battery}%`;
     }
     if (data.brain !== undefined) {
-        document.getElementById('brain-status').textContent = data.brain;
-        document.getElementById('brain-status').style.color = 
-            data.brain === 'GPT-4o Online' ? 'var(--accent-green)' : 'var(--accent-gold)';
+        const brainEl = document.getElementById('brain-status');
+        brainEl.textContent = data.brain;
+        if (data.brain.includes('Online')) {
+            brainEl.style.color = 'var(--accent-green)';
+        } else if (data.brain.includes('Active')) {
+            brainEl.style.color = '#00c3ff';
+        } else {
+            brainEl.style.color = 'var(--accent-gold)';
+        }
     }
 }
 
 if (typeof eel !== 'undefined') {
     eel.expose(updateSystemBar);
 }
+
 
 
 // ============================================================
