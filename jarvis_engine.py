@@ -19,10 +19,17 @@ import time
 import datetime
 import urllib.parse
 import urllib.request
+import html
 import subprocess
 import webbrowser
 import psutil
 import wikipedia
+
+# Set User-Agent for Wikipedia API requests
+try:
+    wikipedia.set_user_agent("JarvisAssistant/1.0 (https://github.com/KOUSHAL0509/jarvis-assistant; contact@jarvis.ai)")
+except Exception:
+    pass
 
 # Optional Imports
 try:
@@ -303,11 +310,89 @@ def generate_code_response(query):
     return None
 
 
+def fetch_web_search_results(query):
+    """
+    Fetches live web search results from DuckDuckGo HTML / API & Wikipedia directly into Python.
+    Parses top titles and snippets to build a comprehensive answer directly inside Jarvis
+    WITHOUT opening any external web browser.
+    """
+    clean_q = re.sub(r'^(search for|search|google for|google)\s+', '', query, flags=re.I).strip()
+    if not clean_q:
+        return "Please specify what you would like me to search for, sir."
+
+    results = []
+
+    # 1. DuckDuckGo Instant Answer API
+    try:
+        url_api = f"https://api.duckduckgo.com/?q={urllib.parse.quote(clean_q)}&format=json&no_html=1&skip_disambig=1"
+        req = urllib.request.Request(url_api, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        with urllib.request.urlopen(req, timeout=4) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            abstract = data.get('AbstractText', '').strip()
+            if abstract:
+                results.append(f"**Overview:**\n{abstract}")
+            answer = data.get('Answer', '').strip()
+            if answer and answer not in results:
+                results.append(f"**Quick Answer:**\n{answer}")
+    except Exception:
+        pass
+
+    # 2. Wikipedia Article Summary
+    try:
+        search_results = wikipedia.search(clean_q)
+        if search_results:
+            summary = wikipedia.summary(search_results[0], sentences=3)
+            summary = re.sub(r'\([^)]*\)', '', summary).strip()
+            if summary and summary not in results:
+                results.append(f"**From Wikipedia ({search_results[0]}):**\n{summary}")
+    except Exception:
+        pass
+
+    # 3. DuckDuckGo HTML Web Search Scraper
+    try:
+        search_url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(clean_q)}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://html.duckduckgo.com/'
+        }
+        req = urllib.request.Request(search_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=5) as response:
+            raw_html = response.read().decode('utf-8', errors='ignore')
+            titles = re.findall(r'class="result__a"[^>]*>(.*?)</a>', raw_html, re.S)
+            snippets = re.findall(r'class="result__snippet"[^>]*>(.*?)</a>', raw_html, re.S)
+            
+            clean = lambda s: html.unescape(re.sub(r'<[^>]+>', '', s)).strip()
+            
+            extracted = []
+            for t, s in zip(titles[:4], snippets[:4]):
+                clean_title = clean(t)
+                clean_snip = clean(s)
+                if clean_title and clean_snip and clean_title not in extracted:
+                    extracted.append(f"• **{clean_title}**\n  {clean_snip}")
+            
+            if extracted:
+                results.append("**Top Web Search Findings:**\n" + "\n\n".join(extracted))
+    except Exception as e:
+        print(f"[!] Live search scraper error: {e}")
+
+    if results:
+        full_text = f"Here is the information I gathered for **'{clean_q}'**, sir:\n\n" + "\n\n".join(results)
+        if not full_text.lower().endswith("sir."):
+            full_text += "\n\nI hope this answers your query, sir."
+        return full_text
+
+    return (
+        f"I searched for **'{clean_q}'**, sir, but could not retrieve matching entries at this moment. "
+        f"Please check your internet connection or try rephrasing."
+    )
+
+
 def ask_free_knowledge_engine(query):
     """
     Zero-config free AI & knowledge engine fallback.
-    Combines DuckDuckGo Instant Answers, Wikipedia, Free Dictionary, Math Engine, and Code Synthesizer
-    to generate detailed ChatGPT-style responses without needing any API key!
+    Combines DuckDuckGo Instant Answers, Wikipedia, Free Dictionary, Math Engine, Code Synthesizer,
+    and Live Web Search Scraping to generate detailed ChatGPT-style responses directly in Jarvis!
     """
     clean_q = query.strip()
     sections = []
@@ -343,17 +428,8 @@ def ask_free_knowledge_engine(query):
             response += "\n\nI hope this answers your query, sir."
         return response
 
-    # 6. Fallback Web Search Launch
-    search_url = f"https://www.google.com/search?q={urllib.parse.quote(clean_q)}"
-    try:
-        webbrowser.open(search_url)
-    except Exception:
-        pass
-
-    return (
-        f"I searched my knowledge base for **'{clean_q}'**, sir.\n\n"
-        f"I have launched a live search in your browser so you can view all relevant results and details immediately."
-    )
+    # 6. Fallback Web Search Scraper (Delivers results inside Jarvis UI, NO browser launch!)
+    return fetch_web_search_results(clean_q)
 
 
 def ask_multi_llm(query):
@@ -638,8 +714,7 @@ def execute_action(command):
     if cmd.startswith('search ') or cmd.startswith('google ') or cmd.startswith('search for '):
         query = re.sub(r'^(search for|search|google for|google)\s+', '', cmd, flags=re.I).strip()
         if query:
-            webbrowser.open(f'https://www.google.com/search?q={urllib.parse.quote(query)}')
-            return f"Searching Google for '{query}', sir."
+            return fetch_web_search_results(query)
 
     # --- Screenshots ---
     if any(kw in cmd for kw in ['take screenshot', 'screenshot', 'capture screen', 'snap screen']):

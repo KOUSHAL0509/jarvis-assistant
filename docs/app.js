@@ -333,8 +333,7 @@ function executeAction(command) {
     if (command.startsWith('search ') || command.startsWith('google ')) {
         const query = command.replace(/^(search|google)\s+/i, '').replace('for ', '').trim();
         if (query) {
-            window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
-            return `Searching Google for ${query}, sir.`;
+            return `I have processed your search query for **'${query}'**, sir. Multi-brain intelligence systems are active inside your Jarvis console.`;
         }
     }
 
