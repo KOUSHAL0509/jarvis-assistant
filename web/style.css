@@ -238,13 +238,72 @@ html, body {
 }
 
 /* ============================================================
-   CENTER PANEL
+   CENTER PANEL & ASTRA MODE BAR
    ============================================================ */
 #center-panel {
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-height: 0;
+}
+
+#astra-mode-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 30px;
+    background: rgba(10, 16, 48, 0.7);
+    border: 1px solid var(--glass-border);
+}
+
+.mode-label {
+    font-family: var(--font-display);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+    margin-right: 4px;
+}
+
+.mode-btn {
+    background: rgba(0, 195, 255, 0.05);
+    border: 1px solid rgba(0, 195, 255, 0.15);
+    color: var(--text-primary);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mode-btn:hover {
+    border-color: var(--accent-blue);
+    background: rgba(0, 195, 255, 0.15);
+    transform: translateY(-1px);
+}
+
+.mode-btn.active {
+    background: linear-gradient(135deg, rgba(0, 195, 255, 0.25), rgba(157, 78, 221, 0.25));
+    border-color: var(--accent-blue);
+    color: #ffffff;
+    box-shadow: 0 0 12px rgba(0, 195, 255, 0.3);
+}
+
+.mode-btn[data-mode="vision"].active {
+    border-color: #9d4edd;
+    box-shadow: 0 0 12px rgba(157, 78, 221, 0.4);
+}
+
+.mode-btn[data-mode="executive"].active {
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 12px rgba(240, 192, 64, 0.4);
+}
+
+.mode-btn[data-mode="engineer"].active {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 12px rgba(0, 255, 136, 0.4);
 }
 
 /* ORB */
@@ -413,6 +472,19 @@ html, body {
     color: #a8dadc;
     line-height: 1.5;
     white-space: pre;
+}
+
+.chat-link {
+    color: #00c3ff;
+    text-decoration: underline;
+    font-weight: 500;
+    word-break: break-all;
+    transition: all 0.2s ease;
+}
+
+.chat-link:hover {
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(0, 195, 255, 0.8);
 }
 
 

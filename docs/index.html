@@ -37,6 +37,22 @@
         <aside id="actions-panel" class="glass-panel">
             <h3 class="panel-title">QUICK ACTIONS</h3>
             <div class="actions-grid">
+                <button class="action-btn" data-cmd="what's on my screen" id="btn-vision">
+                    <div class="action-icon">👁️</div>
+                    <span>Vision</span>
+                </button>
+                <button class="action-btn" data-cmd="show my notes" id="btn-notes">
+                    <div class="action-icon">📝</div>
+                    <span>Notes</span>
+                </button>
+                <button class="action-btn" data-cmd="show my todos" id="btn-todos">
+                    <div class="action-icon">📋</div>
+                    <span>To-Dos</span>
+                </button>
+                <button class="action-btn" data-cmd="what do you remember" id="btn-memory">
+                    <div class="action-icon">🧠</div>
+                    <span>Memory</span>
+                </button>
                 <button class="action-btn" data-cmd="open youtube" id="btn-youtube">
                     <div class="action-icon">▶</div>
                     <span>YouTube</span>
@@ -57,10 +73,6 @@
                     <div class="action-icon">⏱</div>
                     <span>Time</span>
                 </button>
-                <button class="action-btn" data-cmd="what date" id="btn-date">
-                    <div class="action-icon">📅</div>
-                    <span>Date</span>
-                </button>
                 <button class="action-btn" data-cmd="who are you" id="btn-identity">
                     <div class="action-icon">🤖</div>
                     <span>About</span>
@@ -74,6 +86,15 @@
 
         <!-- Center: Orb + Conversation -->
         <section id="center-panel">
+            <!-- Astra Mode Selector -->
+            <div id="astra-mode-bar" class="glass-panel">
+                <span class="mode-label">ASTRA MODE:</span>
+                <button class="mode-btn active" data-mode="companion" id="mode-companion">🩵 Companion</button>
+                <button class="mode-btn" data-mode="vision" id="mode-vision">💜 Vision</button>
+                <button class="mode-btn" data-mode="executive" id="mode-executive">💛 Executive</button>
+                <button class="mode-btn" data-mode="engineer" id="mode-engineer">💚 Engineer</button>
+            </div>
+
             <!-- Jarvis Orb -->
             <div id="orb-container">
                 <canvas id="orb-canvas" width="220" height="220"></canvas>

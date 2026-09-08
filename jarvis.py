@@ -3,12 +3,36 @@ JARVIS - AI Voice Assistant for Windows
 Ported to Windows with pyttsx3 TTS, Google Speech Recognition, and Universal Multi-LLM Brain.
 """
 
-import speech_recognition as sr
-import pyttsx3
-import datetime
 import os
 import sys
-import time
+import subprocess
+import datetime
+try:
+    import pywintypes
+    import pythoncom
+except ImportError:
+    if sys.platform == 'win32':
+        print("[!] Missing 'pywin32' (pywintypes / pythoncom). Installing...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "pywin32"])
+            import pywintypes
+            import pythoncom
+        except Exception:
+            pass
+
+try:
+    import speech_recognition as sr
+except ImportError:
+    print("[!] Missing 'SpeechRecognition'. Installing...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "SpeechRecognition"])
+    import speech_recognition as sr
+
+try:
+    import pyttsx3
+except ImportError:
+    print("[!] Missing 'pyttsx3'. Installing...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyttsx3"])
+    import pyttsx3
 
 # Import Universal Processing Engine
 import jarvis_engine
@@ -32,6 +56,11 @@ def speak(text):
         return
     print(f"🗣️  Jarvis (Speaking): {text}")
     try:
+        try:
+            import pythoncom
+            pythoncom.CoInitialize()
+        except Exception:
+            pass
         engine.say(text)
         engine.runAndWait()
     except Exception as e:
@@ -77,12 +106,12 @@ def greet():
     """Greet the user based on time of day"""
     hour = datetime.datetime.now().hour
     if hour < 12:
-        speak("Good Morning, sir!")
+        speak("Good morning!")
     elif hour < 18:
-        speak("Good Afternoon, sir!")
+        speak("Good afternoon!")
     else:
-        speak("Good Evening, sir!")
-    speak("Jarvis online. All systems operational. How may I assist you?")
+        speak("Good evening!")
+    speak("Jarvis online! How can I help you today?")
 
 def main():
     active_brain = jarvis_engine.get_active_brain_status()
@@ -94,7 +123,7 @@ def main():
     print("🎤 Ears:    Google Speech Recognition")
     print("⚡ Actions: Windows System Commands + Universal Query Engine")
     print("=" * 60)
-    print("\n💡 Speak naturally or ask ANYTHING like ChatGPT. Say 'exit' or 'goodbye' to quit.\n")
+    print("\n💡 Speak naturally or ask ANYTHING. Say 'exit' or 'goodbye' to quit.\n")
 
     greet()
 
@@ -107,7 +136,7 @@ def main():
         full_response, spoken_summary = jarvis_engine.get_answer_and_summary(command)
 
         if full_response == "EXIT":
-            speak("Powering down. Goodbye, sir.")
+            speak("Powering down. Goodbye, my friend!")
             break
 
         # Display full ChatGPT response in console

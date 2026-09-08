@@ -4,16 +4,60 @@ Uses Eel (Python + HTML/CSS/JS) for a visual frontend.
 Integrates: Speech Recognition, pyttsx3 TTS, Universal Multi-LLM Brain, Windows system commands.
 """
 
-import eel
-import speech_recognition as sr
-import pyttsx3
-import datetime
 import os
 import sys
 import subprocess
-import psutil
 import threading
 import time
+import datetime
+
+try:
+    import psutil
+except ImportError:
+    print("[!] Missing 'psutil'. Installing...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "psutil"])
+    import psutil
+
+try:
+    import pywintypes
+    import pythoncom
+except ImportError:
+    if sys.platform == 'win32':
+        print("[!] Missing 'pywin32' (pywintypes / pythoncom). Installing...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "pywin32"])
+            import pywintypes
+            import pythoncom
+        except Exception:
+            pass
+
+# Automatic installation / safe import for Eel GUI framework
+try:
+    import eel
+except ImportError:
+    print("[!] Missing required library 'eel'. Attempting automatic installation...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "eel"])
+        import eel
+        print("[+] 'eel' installed successfully!\n")
+    except Exception as err:
+        print(f"[X] Auto-install failed: {err}")
+        print("[!] Please run: pip install eel (or pip install -r requirements.txt)")
+        sys.exit(1)
+
+try:
+    import speech_recognition as sr
+except ImportError:
+    print("[!] Missing 'SpeechRecognition'. Installing...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "SpeechRecognition"])
+    import speech_recognition as sr
+
+try:
+    import pyttsx3
+except ImportError:
+    print("[!] Missing 'pyttsx3'. Installing...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyttsx3"])
+    import pyttsx3
 
 # Import Universal Processing Engine
 import jarvis_engine
@@ -41,6 +85,11 @@ def speak(text):
     def _speak():
         with tts_lock:
             try:
+                try:
+                    import pythoncom
+                    pythoncom.CoInitialize()
+                except Exception:
+                    pass
                 engine.say(text)
                 engine.runAndWait()
             except Exception as e:
@@ -80,7 +129,7 @@ def listen_once():
 
 @eel.expose
 def execute_command(text):
-    """Execute any voice or text command — processed by Universal Universal Brain Engine."""
+    """Execute any voice or text command — processed by Universal Brain Engine."""
     command = text.strip()
     if not command:
         return
@@ -99,7 +148,14 @@ def execute_command(text):
     eel.setOrbState("speaking")
     eel.addMessage("JARVIS", full_response)
     speak(spoken_summary)
-    time.sleep(0.5)
+    
+    if spoken_summary and voice_enabled:
+        words = len(spoken_summary.split())
+        speech_duration = max(1.5, min(8.0, words / 2.8))
+        time.sleep(speech_duration)
+    else:
+        time.sleep(0.5)
+        
     eel.setOrbState("idle")
 
 
@@ -133,6 +189,26 @@ def get_system_status():
     data["brain"] = jarvis_engine.get_active_brain_status()
     eel.updateSystemBar(data)
 
+
+@eel.expose
+def set_astra_mode(mode):
+    """Switch Astra Operational Mode."""
+    res = jarvis_engine.set_astra_mode(mode)
+    eel.addMessage("JARVIS", res)
+    speak(f"Astra mode switched to {mode}")
+
+@eel.expose
+def trigger_screen_vision(query=None):
+    """Trigger desktop screen vision analysis."""
+    eel.setOrbState("thinking")
+    eel.addMessage("You", "Analyze Screen Vision")
+    res = jarvis_engine.analyze_screen(query)
+    eel.setOrbState("speaking")
+    eel.addMessage("JARVIS", res)
+    spoken = jarvis_engine.get_spoken_summary(res)
+    speak(spoken)
+    time.sleep(2)
+    eel.setOrbState("idle")
 
 @eel.expose
 def toggle_voice(enabled):
@@ -223,3 +299,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    

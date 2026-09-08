@@ -81,6 +81,14 @@ const orbLabel = document.getElementById('orb-label');
 let orbState = 'idle';
 let orbTime = 0;
 
+const ASTRA_MODE_COLORS = {
+    companion: { r: 0, g: 195, b: 255 },
+    vision:    { r: 157, g: 78, b: 221 },
+    executive: { r: 240, g: 192, b: 64 },
+    engineer:  { r: 0, g: 255, b: 136 }
+};
+let currentAstraModeTheme = 'companion';
+
 const ORB_COLORS = {
     idle:      { r: 0, g: 195, b: 255 },
     listening: { r: 0, g: 255, b: 136 },
@@ -98,7 +106,8 @@ function drawOrb() {
     orbCtx.clearRect(0, 0, W, H);
     orbTime += 0.02;
 
-    const color = ORB_COLORS[orbState] || ORB_COLORS.idle;
+    const baseColor = ASTRA_MODE_COLORS[currentAstraModeTheme] || ORB_COLORS.idle;
+    const color = (orbState === 'idle' || orbState === 'speaking') ? baseColor : (ORB_COLORS[orbState] || baseColor);
     const intensity = orbState === 'idle' ? 0.6 : 1.0;
     const pulseSpeed = orbState === 'listening' ? 3 : orbState === 'thinking' ? 5 : 1.5;
     const pulseAmp = orbState === 'thinking' ? 8 : orbState === 'listening' ? 5 : 3;
@@ -194,21 +203,47 @@ updateClock();
 // ============================================================
 const messagesContainer = document.getElementById('messages');
 
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatMessageText(text) {
+    if (!text) return '';
+    const codeBlocks = [];
+    let placeholderText = text.replace(/```(\w*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+        const idx = codeBlocks.length;
+        codeBlocks.push({ lang, code: escapeHtml(code.trim()) });
+        return `___CODE_BLOCK_${idx}___`;
+    });
+
+    let escaped = escapeHtml(placeholderText);
+    escaped = escaped.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="chat-link">$1</a>');
+    escaped = escaped.replace(/(?<!href="|">)(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer" class="chat-link">$1</a>');
+    escaped = escaped.replace(/\n/g, '<br>');
+
+    codeBlocks.forEach((item, idx) => {
+        const langBadge = item.lang ? `<span class="code-lang">${escapeHtml(item.lang.toUpperCase())}</span>` : '';
+        const blockHtml = `<div class="code-container">${langBadge}<pre class="code-block"><code>${item.code}</code></pre></div>`;
+        escaped = escaped.replace(`___CODE_BLOCK_${idx}___`, blockHtml);
+    });
+    return escaped;
+}
+
 function addMessage(sender, text) {
     const div = document.createElement('div');
     const isJarvis = sender.toLowerCase() === 'jarvis';
     div.className = `message ${isJarvis ? 'jarvis-msg' : 'user-msg'}`;
 
-    const senderSpan = document.createElement('span');
-    senderSpan.className = 'msg-sender';
-    senderSpan.textContent = sender.toUpperCase();
+    const formattedContent = formatMessageText(text);
 
-    const textSpan = document.createElement('span');
-    textSpan.className = 'msg-text';
-    textSpan.textContent = text;
-
-    div.appendChild(senderSpan);
-    div.appendChild(textSpan);
+    div.innerHTML = `
+        <span class="msg-sender">${sender.toUpperCase()}</span>
+        <div class="msg-text">${formattedContent}</div>
+    `;
     messagesContainer.appendChild(div);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
@@ -262,7 +297,7 @@ async function askGPT(query) {
     }
 
     const messages = [
-        { role: "system", content: "You are JARVIS, Tony Stark's AI assistant from Iron Man. You are witty, intelligent, and speak concisely in 1-2 sentences max. Address the user as 'sir'." },
+        { role: "system", content: "You are JARVIS, a friendly, casual AI companion. Answer concisely and naturally in a warm friend-to-friend conversational style, in 1 to 3 short sentences." },
         ...conversationHistory.slice(-6),
         { role: "user", content: query }
     ];
@@ -309,57 +344,155 @@ function updateBrainStatus() {
 }
 
 
+// LocalStorage Personal Assistant Memory helpers
+function getLocalMemory() {
+    const defaultData = { name: "Koushal", facts: [], notes: [], todos: [] };
+    try {
+        const stored = localStorage.getItem('jarvis_memory');
+        return stored ? { ...defaultData, ...JSON.parse(stored) } : defaultData;
+    } catch (e) {
+        return defaultData;
+    }
+}
+function saveLocalMemory(data) {
+    try { localStorage.setItem('jarvis_memory', JSON.stringify(data)); } catch (e) {}
+}
+
 // ============================================================
 //  ACTIONS — Execute commands in the browser
 // ============================================================
 function executeAction(command) {
+    const mem = getLocalMemory();
+    const userName = mem.name || 'sir';
+
+    // User Name
+    if (command.startsWith('call me ') || command.startsWith('my name is ')) {
+        const name = command.replace(/^(call me|my name is)\s+/i, '').trim();
+        if (name) {
+            mem.name = name.charAt(0).toUpperCase() + name.slice(1);
+            saveLocalMemory(mem);
+            return `Got it! I will call you ${mem.name} from now on.`;
+        }
+    }
+    if (['what is my name', "what's my name", 'who am i'].includes(command)) {
+        return `Your name is ${userName}!`;
+    }
+
+    // Memory Facts
+    if (command.startsWith('remember that ') || command.startswith('remember ')) {
+        const fact = command.replace(/^(remember that|remember)\s+/i, '').trim();
+        if (fact) {
+            if (!mem.facts.includes(fact)) mem.facts.push(fact);
+            saveLocalMemory(mem);
+            return `I've remembered that: '${fact}', ${userName}!`;
+        }
+    }
+    if (['what do you remember', 'my memory', 'recall memory', 'saved facts'].includes(command)) {
+        if (!mem.facts || mem.facts.length === 0) return `I don't have any saved facts in memory yet, ${userName}.`;
+        return `🧠 **Here is what I remember about you, ${userName}:**\n` + mem.facts.map((f, i) => `${i + 1}. ${f}`).join('\n');
+    }
+    if (['clear memory facts', 'forget facts', 'clear facts'].includes(command)) {
+        mem.facts = [];
+        saveLocalMemory(mem);
+        return `All saved memory facts have been cleared, ${userName}.`;
+    }
+
+    // Notes Manager
+    if (command.startsWith('save note ') || command.startsWith('take note ') || command.startsWith('note down ')) {
+        const text = command.replace(/^(save note|take note|note down)\s+/i, '').trim();
+        if (text) {
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            mem.notes.push({ text, time });
+            saveLocalMemory(mem);
+            return `📝 Note saved: '${text}' (${time})`;
+        }
+    }
+    if (['show notes', 'show my notes', 'read notes', 'read my notes', 'view notes', 'my notes'].includes(command)) {
+        if (!mem.notes || mem.notes.length === 0) return `You don't have any saved notes, ${userName}.`;
+        return `📝 **Your Notes (${mem.notes.length}):**\n` + mem.notes.map((n, i) => `${i + 1}. ${n.text} _(${n.time})_`).join('\n');
+    }
+    if (['clear notes', 'delete all notes'].includes(command)) {
+        mem.notes = [];
+        saveLocalMemory(mem);
+        return `All notes cleared, ${userName}.`;
+    }
+
+    // To-Do Manager
+    if (command.startsWith('add todo ') || command.startsWith('add task ') || command.startsWith('add to my todo list ')) {
+        const task = command.replace(/^(add todo|add task|add to my todo list|add to todo)\s+/i, '').trim();
+        if (task) {
+            mem.todos.push({ task, done: false });
+            saveLocalMemory(mem);
+            return `📋 Added to your to-do list: '${task}', ${userName}!`;
+        }
+    }
+    if (['show my todos', 'show todo list', 'my todo list', 'show todos', 'my tasks'].includes(command)) {
+        if (!mem.todos || mem.todos.length === 0) return `Your to-do list is empty, ${userName}!`;
+        const pending = mem.todos.filter(t => !t.done).length;
+        return `📋 **Your To-Do List (${pending} pending):**\n` + mem.todos.map((t, i) => `${i + 1}. ${t.done ? '✅' : '⏳'} ${t.task}`).join('\n');
+    }
+    if (['clear todo list', 'clear todos', 'delete all todos'].includes(command)) {
+        mem.todos = [];
+        saveLocalMemory(mem);
+        return `Your to-do list has been cleared, ${userName}.`;
+    }
+
     // Web links
     if (command.includes('open youtube') || command === 'youtube') {
         window.open('https://www.youtube.com', '_blank');
-        return "Opening YouTube, sir.";
+        return `Opening YouTube, ${userName}.`;
     }
     if (command.includes('open google') || command === 'google') {
         window.open('https://www.google.com', '_blank');
-        return "Opening Google, sir.";
+        return `Opening Google, ${userName}.`;
     }
     if (command.includes('open github') || command === 'github') {
         window.open('https://www.github.com', '_blank');
-        return "Opening GitHub, sir.";
+        return `Opening GitHub, ${userName}.`;
     }
     if (command.includes('open chatgpt') || command.includes('chat gpt')) {
         window.open('https://chat.openai.com', '_blank');
-        return "Opening ChatGPT, sir.";
+        return `Opening ChatGPT, ${userName}.`;
     }
     if (command.startsWith('search ') || command.startsWith('google ')) {
         const query = command.replace(/^(search|google)\s+/i, '').replace('for ', '').trim();
         if (query) {
-            return `I have processed your search query for **'${query}'**, sir. Multi-brain intelligence systems are active inside your Jarvis console.`;
+            window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, '_blank');
+            return `Searching Google for **'${query}'**, ${userName}.`;
         }
     }
 
     // Date & Time
     if (['what time', 'the time', 'current time', 'tell me the time'].some(k => command.includes(k))) {
         const t = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-        return `The current time is ${t}, sir.`;
+        return `The current time is ${t}, ${userName}.`;
     }
     if (['what date', 'the date', "today's date", 'todays date', 'what day'].some(k => command.includes(k))) {
         const d = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        return `Today is ${d}, sir.`;
+        return `Today is ${d}, ${userName}.`;
+    }
+
+    // Jokes & Quotes
+    if (['tell me a joke', 'joke'].some(k => command.includes(k))) {
+        return "Why do programmers prefer dark mode? Because light attracts bugs! 😄";
+    }
+    if (['quote', 'inspirational quote'].some(k => command.includes(k))) {
+        return "“The best way to predict the future is to invent it.” — Alan Kay";
     }
 
     // Identity
     if (['who are you', 'what are you', 'introduce yourself'].some(k => command.includes(k))) {
-        return "I am Jarvis, your personal AI assistant. Modeled after Tony Stark's companion system. I am here to serve, sir.";
+        return `I am JARVIS, your personal AI assistant. Modeled after Tony Stark's companion system. Ready to assist you, ${userName}!`;
     }
     if (['how are you', "how's it going", 'how do you do'].some(k => command.includes(k))) {
-        return "All systems are operating at peak efficiency, sir. Thank you for asking.";
+        return `All systems are operating at peak efficiency, ${userName}. Thank you for asking.`;
     }
 
     // Clear
     if (['clear history', 'forget everything', 'reset memory'].some(k => command.includes(k))) {
         conversationHistory = [];
         messagesContainer.innerHTML = '';
-        return "Conversation history cleared, sir. Fresh start.";
+        return `Conversation history cleared, ${userName}. Fresh start.`;
     }
 
     return null; // No match
@@ -469,6 +602,19 @@ micBtn.addEventListener('click', () => {
     recognition.start();
 });
 
+
+// ============================================================
+//  ASTRA MODE BUTTONS
+// ============================================================
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.mode;
+        currentAstraModeTheme = mode;
+        addMessage('JARVIS', `Switched to Astra **${mode.toUpperCase()}** mode, sir.`);
+    });
+});
 
 // ============================================================
 //  QUICK ACTION BUTTONS

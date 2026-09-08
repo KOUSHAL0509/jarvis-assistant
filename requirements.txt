@@ -7,5 +7,7 @@ openai
 requests
 python-dotenv
 pyautogui
+pillow
 eel
+pywin32
 

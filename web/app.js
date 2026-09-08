@@ -86,6 +86,14 @@ const orbLabel = document.getElementById('orb-label');
 let orbState = 'idle'; // idle, listening, thinking, speaking
 let orbTime = 0;
 
+const ASTRA_MODE_COLORS = {
+    companion: { r: 0, g: 195, b: 255 },
+    vision:    { r: 157, g: 78, b: 221 },
+    executive: { r: 240, g: 192, b: 64 },
+    engineer:  { r: 0, g: 255, b: 136 }
+};
+let currentAstraModeTheme = 'companion';
+
 const ORB_COLORS = {
     idle:      { r: 0, g: 195, b: 255 },
     listening: { r: 0, g: 255, b: 136 },
@@ -103,7 +111,8 @@ function drawOrb() {
     orbCtx.clearRect(0, 0, W, H);
     orbTime += 0.02;
 
-    const color = ORB_COLORS[orbState] || ORB_COLORS.idle;
+    const baseColor = ASTRA_MODE_COLORS[currentAstraModeTheme] || ORB_COLORS.idle;
+    const color = (orbState === 'idle' || orbState === 'speaking') ? baseColor : (ORB_COLORS[orbState] || baseColor);
     const intensity = orbState === 'idle' ? 0.6 : 1.0;
     const pulseSpeed = orbState === 'listening' ? 3 : orbState === 'thinking' ? 5 : 1.5;
     const pulseAmp = orbState === 'thinking' ? 8 : orbState === 'listening' ? 5 : 3;
@@ -251,6 +260,14 @@ function formatMessageText(text) {
     // Bold: **text**
     escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 
+    // Markdown links: [title](url)
+    escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s\)]+)\)/g, 
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="chat-link">$1</a>');
+
+    // Standalone URLs: https://...
+    escaped = escaped.replace(/(?<!href="|">)(https?:\/\/[^\s<]+)/g, 
+        '<a href="$1" target="_blank" rel="noopener noreferrer" class="chat-link">$1</a>');
+
     // Convert newlines to <br>
     escaped = escaped.replace(/\n/g, '<br>');
 
@@ -385,6 +402,24 @@ document.querySelectorAll('.action-btn').forEach(btn => {
                 addMessage('JARVIS', `Would execute: "${cmd}" (preview mode)`);
                 setOrbState('idle');
             }, 500);
+        }
+    });
+});
+
+
+// ============================================================
+//  ASTRA MODE BUTTONS
+// ============================================================
+document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.mode;
+        currentAstraModeTheme = mode;
+        if (typeof eel !== 'undefined') {
+            await eel.set_astra_mode(mode)();
+        } else {
+            addMessage('JARVIS', `Switched to Astra ${mode.toUpperCase()} mode.`);
         }
     });
 });
