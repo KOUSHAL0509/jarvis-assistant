@@ -2,7 +2,7 @@
 
 A fully-featured, Iron Man-inspired AI voice assistant for **Windows** with ChatGPT brain, voice interaction, and system actions.
 
-Inspired by [prudhviraj0310/jarvis-learning-server](https://github.com/prudhviraj0310/jarvis-learning-server) and ported to Windows.
+Inspired by Jarvis form Ironman
 
 ---
 
