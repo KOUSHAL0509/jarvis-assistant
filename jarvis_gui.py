@@ -68,15 +68,51 @@ import jarvis_engine
 # ============================================================
 engine = pyttsx3.init('sapi5')
 voices = engine.getProperty('voices')
-
-for v in voices:
-    if "david" in v.name.lower():
-        engine.setProperty('voice', v.id)
-        break
-engine.setProperty('rate', 175)
-
-voice_enabled = True
 tts_lock = threading.Lock()
+voice_enabled = True
+
+def get_voice_list():
+    """Format and return list of installed SAPI5 voices."""
+    result = []
+    for v in voices:
+        clean_name = v.name
+        if "Microsoft" in clean_name and "Desktop" in clean_name:
+            clean_name = clean_name.replace("Microsoft ", "").replace(" Desktop - English (United States)", " (US)").replace(" Desktop - English (Great Britain)", " (UK)")
+        result.append({
+            "id": v.id,
+            "name": clean_name,
+            "raw_name": v.name
+        })
+    return result
+
+def init_voice_settings():
+    """Apply saved voice persona and speed from user memory."""
+    v_config = jarvis_engine.get_voice_settings()
+    target_id = v_config.get("voice_id")
+    target_rate = v_config.get("voice_rate", 175)
+    
+    try:
+        engine.setProperty('rate', target_rate)
+    except Exception:
+        pass
+        
+    applied_voice = None
+    if target_id:
+        for v in voices:
+            if v.id == target_id:
+                engine.setProperty('voice', v.id)
+                applied_voice = v
+                break
+    if not applied_voice:
+        for v in voices:
+            if "david" in v.name.lower():
+                engine.setProperty('voice', v.id)
+                applied_voice = v
+                break
+        if not applied_voice and voices:
+            engine.setProperty('voice', voices[0].id)
+
+init_voice_settings()
 
 def speak(text):
     """Jarvis speaks out loud (thread-safe)"""
@@ -218,6 +254,57 @@ def toggle_voice(enabled):
     status = "enabled" if enabled else "disabled"
     eel.addMessage("JARVIS", f"Voice output {status}, sir.")
 
+@eel.expose
+def get_voices():
+    """Return available system SAPI5 voices and current selection."""
+    try:
+        current_id = engine.getProperty('voice')
+        current_rate = engine.getProperty('rate')
+    except Exception:
+        current_id = None
+        current_rate = 175
+    return {
+        "voices": get_voice_list(),
+        "current_voice": current_id,
+        "current_rate": current_rate
+    }
+
+@eel.expose
+def set_voice(voice_id):
+    """Set active TTS voice."""
+    for v in voices:
+        if v.id == voice_id:
+            try:
+                engine.setProperty('voice', v.id)
+                jarvis_engine.save_voice_settings(voice_id=v.id)
+                clean = v.name.replace("Microsoft ", "").replace(" Desktop", "")
+                try:
+                    eel.addMessage("JARVIS", f"Voice set to {clean}, sir.")
+                except Exception:
+                    pass
+                return {"success": True, "voice_id": v.id, "name": clean}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+    return {"success": False, "error": "Voice not found"}
+
+@eel.expose
+def set_voice_speed(rate):
+    """Set active TTS speech rate (WPM)."""
+    try:
+        r = int(rate)
+        engine.setProperty('rate', r)
+        jarvis_engine.save_voice_settings(voice_rate=r)
+        return {"success": True, "rate": r}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@eel.expose
+def test_voice(text=None):
+    """Speak a test sample with the currently configured voice."""
+    sample = text if text else "Voice output test. Hello sir, I am JARVIS, ready to assist."
+    speak(sample)
+    return {"success": True}
+
 
 auto_listen = False
 
@@ -273,8 +360,8 @@ def main():
     print("[i] Close the browser window or say 'exit' to quit.\n")
 
     modes_to_try = [
-        {'mode': 'edge', 'size': (1280, 800), 'position': (100, 50)},
-        {'mode': 'chrome', 'size': (1280, 800), 'position': (100, 50)},
+        {'mode': 'edge', 'size': (1280, 800), 'position': (100, 50), 'cmdline_args': ['--enable-transparent-visuals']},
+        {'mode': 'chrome', 'size': (1280, 800), 'position': (100, 50), 'cmdline_args': ['--enable-transparent-visuals']},
         {'mode': None, 'app_mode': False}
     ]
 

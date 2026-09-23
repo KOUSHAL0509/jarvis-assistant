@@ -78,7 +78,64 @@
 
 
 // ============================================================
-//  ORB ANIMATION
+//  SIRI AUDIO CHIMES (Web Audio API)
+// ============================================================
+function playSiriActivationChime() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        
+        // Siri double chime tone 1 (C5 - 523Hz)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(523.25, now);
+        gain1.gain.setValueAtTime(0.12, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.14);
+
+        // Siri double chime tone 2 (G5 - 784Hz)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(783.99, now + 0.08);
+        gain2.gain.setValueAtTime(0.15, now + 0.08);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.08);
+        osc2.stop(now + 0.24);
+    } catch (e) {}
+}
+
+function playSiriCompletionChime() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(659.25, now); // E5
+        osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.12); // C6
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+    } catch (e) {}
+}
+
+// ============================================================
+//  ORB ANIMATION (Siri Waveform & Orb)
 // ============================================================
 const orbCanvas = document.getElementById('orb-canvas');
 const orbCtx = orbCanvas.getContext('2d');
@@ -114,8 +171,8 @@ function drawOrb() {
     const baseColor = ASTRA_MODE_COLORS[currentAstraModeTheme] || ORB_COLORS.idle;
     const color = (orbState === 'idle' || orbState === 'speaking') ? baseColor : (ORB_COLORS[orbState] || baseColor);
     const intensity = orbState === 'idle' ? 0.6 : 1.0;
-    const pulseSpeed = orbState === 'listening' ? 3 : orbState === 'thinking' ? 5 : 1.5;
-    const pulseAmp = orbState === 'thinking' ? 8 : orbState === 'listening' ? 5 : 3;
+    const pulseSpeed = orbState === 'listening' ? 3.5 : orbState === 'thinking' ? 5 : 1.5;
+    const pulseAmp = orbState === 'thinking' ? 8 : orbState === 'listening' ? 6 : 3;
 
     // Outer glow rings
     for (let i = 3; i >= 0; i--) {
@@ -125,6 +182,38 @@ function drawOrb() {
         orbCtx.arc(cx, cy, glowR + Math.sin(orbTime * 1.5 + i) * 3, 0, Math.PI * 2);
         orbCtx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
         orbCtx.fill();
+    }
+
+    // Siri Organic Fluid Waveform Layer (Active when Listening / Speaking / Thinking)
+    if (orbState === 'listening' || orbState === 'speaking' || orbState === 'thinking') {
+        const SiriColors = [
+            'rgba(0, 245, 255, ',    // Siri Cyan
+            'rgba(180, 0, 255, ',    // Siri Magenta / Purple
+            'rgba(0, 150, 255, ',    // Deep Electric Blue
+            'rgba(255, 255, 255, '   // Specular Highlight White
+        ];
+        const numWaves = 4;
+        for (let w = 0; w < numWaves; w++) {
+            orbCtx.beginPath();
+            const waveSpeed = orbState === 'listening' ? 3.5 : orbState === 'thinking' ? 5 : 2.5;
+            const wavePhase = orbTime * (waveSpeed + w * 0.5);
+            const amp = orbState === 'listening' ? 16 + w * 4 : orbState === 'speaking' ? 20 + w * 5 : 10;
+            
+            for (let a = 0; a <= Math.PI * 2; a += 0.04) {
+                const r = baseRadius + Math.sin(a * (3 + w) + wavePhase) * amp * Math.cos(a * 2 + orbTime);
+                const x = cx + Math.cos(a) * r;
+                const y = cy + Math.sin(a) * r;
+                if (a === 0) orbCtx.moveTo(x, y);
+                else orbCtx.lineTo(x, y);
+            }
+            orbCtx.closePath();
+            const alpha = (0.22 - w * 0.04) * intensity;
+            orbCtx.fillStyle = SiriColors[w % SiriColors.length] + alpha + ')';
+            orbCtx.fill();
+            orbCtx.strokeStyle = SiriColors[w % SiriColors.length] + (alpha * 1.6) + ')';
+            orbCtx.lineWidth = 1.5;
+            orbCtx.stroke();
+        }
     }
 
     // Rotating ring segments
@@ -189,6 +278,13 @@ drawOrb();
 //  SET ORB STATE (called from Python via eel)
 // ============================================================
 function setOrbState(state) {
+    if (orbState !== state) {
+        if (state === 'listening') {
+            playSiriActivationChime();
+        } else if ((orbState === 'thinking' || orbState === 'speaking') && state === 'idle') {
+            playSiriCompletionChime();
+        }
+    }
     orbState = state;
     orbLabel.textContent = state.toUpperCase();
     orbLabel.className = state;
@@ -426,7 +522,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 
 
 // ============================================================
-//  SETTINGS TOGGLES
+//  SETTINGS TOGGLES & VOICE CONTROLS
 // ============================================================
 document.getElementById('voice-toggle').addEventListener('change', (e) => {
     if (typeof eel !== 'undefined') {
@@ -440,12 +536,98 @@ document.getElementById('autolisten-toggle').addEventListener('change', (e) => {
     }
 });
 
+async function initVoiceControls() {
+    const voiceSelect = document.getElementById('voice-select');
+    const voiceSpeedRange = document.getElementById('voice-speed-range');
+    const voiceSpeedVal = document.getElementById('voice-speed-val');
+    const testVoiceBtn = document.getElementById('test-voice-btn');
+
+    if (typeof eel !== 'undefined') {
+        try {
+            const data = await eel.get_voices()();
+            if (data && data.voices && voiceSelect) {
+                voiceSelect.innerHTML = '';
+                data.voices.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v.id;
+                    opt.textContent = v.name;
+                    if (v.id === data.current_voice) {
+                        opt.selected = true;
+                    }
+                    voiceSelect.appendChild(opt);
+                });
+            }
+            if (data && data.current_rate && voiceSpeedRange) {
+                voiceSpeedRange.value = data.current_rate;
+                if (voiceSpeedVal) voiceSpeedVal.textContent = `${data.current_rate} wpm`;
+            }
+        } catch (err) {
+            console.error("Error loading Eel voices:", err);
+        }
+    } else {
+        if ('speechSynthesis' in window) {
+            function loadWebVoices() {
+                const voices = window.speechSynthesis.getVoices();
+                if (voices.length > 0 && voiceSelect) {
+                    voiceSelect.innerHTML = '';
+                    voices.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v.name;
+                        opt.textContent = `${v.name} (${v.lang})`;
+                        voiceSelect.appendChild(opt);
+                    });
+                }
+            }
+            loadWebVoices();
+            window.speechSynthesis.onvoiceschanged = loadWebVoices;
+        }
+    }
+
+    if (voiceSelect) {
+        voiceSelect.addEventListener('change', async (e) => {
+            const val = e.target.value;
+            if (typeof eel !== 'undefined') {
+                await eel.set_voice(val)();
+            }
+        });
+    }
+
+    if (voiceSpeedRange) {
+        voiceSpeedRange.addEventListener('input', (e) => {
+            const val = e.target.value;
+            if (voiceSpeedVal) voiceSpeedVal.textContent = `${val} wpm`;
+        });
+        voiceSpeedRange.addEventListener('change', async (e) => {
+            const val = e.target.value;
+            if (typeof eel !== 'undefined') {
+                await eel.set_voice_speed(val)();
+            }
+        });
+    }
+
+    if (testVoiceBtn) {
+        testVoiceBtn.addEventListener('click', async () => {
+            if (typeof eel !== 'undefined') {
+                await eel.test_voice()();
+            } else if ('speechSynthesis' in window) {
+                const selectedVoiceName = voiceSelect.value;
+                const voices = window.speechSynthesis.getVoices();
+                const vObj = voices.find(v => v.name === selectedVoiceName);
+                const utter = new SpeechSynthesisUtterance("Voice output test. Hello sir, I am JARVIS, ready to assist.");
+                if (vObj) utter.voice = vObj;
+                utter.rate = (voiceSpeedRange ? voiceSpeedRange.value : 175) / 175;
+                window.speechSynthesis.speak(utter);
+            }
+        });
+    }
+}
 
 // ============================================================
-//  INIT — Fetch system status on load
+//  INIT — Fetch system status & voices on load
 // ============================================================
 window.addEventListener('load', async () => {
     if (typeof eel !== 'undefined') {
         await eel.get_system_status()();
     }
+    await initVoiceControls();
 });

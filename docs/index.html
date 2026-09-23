@@ -159,6 +159,20 @@
                     <span>API Key</span>
                     <button id="apikey-btn" class="apikey-button">Set Key</button>
                 </div>
+                <div class="setting-col">
+                    <label class="setting-label">Voice Persona</label>
+                    <select id="voice-select" class="glass-select">
+                        <option value="">Loading voices...</option>
+                    </select>
+                </div>
+                <div class="setting-col">
+                    <div class="setting-row-compact">
+                        <label class="setting-label">Voice Speed</label>
+                        <span id="voice-speed-val" class="speed-val">175 wpm</span>
+                    </div>
+                    <input type="range" id="voice-speed-range" class="glass-range" min="100" max="260" value="175" step="5">
+                </div>
+                <button id="test-voice-btn" class="glass-btn-full" style="margin-top: 8px;">🔊 Test Voice</button>
             </div>
 
             <h3 class="panel-title" style="margin-top: 24px;">VOICE COMMANDS</h3>

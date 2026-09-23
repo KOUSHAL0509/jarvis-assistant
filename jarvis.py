@@ -44,11 +44,31 @@ import jarvis_engine
 engine = pyttsx3.init('sapi5')
 voices = engine.getProperty('voices')
 
-for v in voices:
-    if "david" in v.name.lower():
-        engine.setProperty('voice', v.id)
-        break
-engine.setProperty('rate', 175)
+def init_voice_settings():
+    v_config = jarvis_engine.get_voice_settings()
+    target_id = v_config.get("voice_id")
+    target_rate = v_config.get("voice_rate", 175)
+    try:
+        engine.setProperty('rate', target_rate)
+    except Exception:
+        pass
+    applied_voice = None
+    if target_id:
+        for v in voices:
+            if v.id == target_id:
+                engine.setProperty('voice', v.id)
+                applied_voice = v
+                break
+    if not applied_voice:
+        for v in voices:
+            if "david" in v.name.lower():
+                engine.setProperty('voice', v.id)
+                applied_voice = v
+                break
+        if not applied_voice and voices:
+            engine.setProperty('voice', voices[0].id)
+
+init_voice_settings()
 
 def speak(text):
     """Jarvis speaks out loud"""

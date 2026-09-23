@@ -87,6 +87,63 @@ const ASTRA_MODE_COLORS = {
     executive: { r: 240, g: 192, b: 64 },
     engineer:  { r: 0, g: 255, b: 136 }
 };
+// ============================================================
+//  SIRI AUDIO CHIMES (Web Audio API)
+// ============================================================
+function playSiriActivationChime() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+        
+        // Siri double chime tone 1 (C5 - 523Hz)
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(523.25, now);
+        gain1.gain.setValueAtTime(0.12, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.14);
+
+        // Siri double chime tone 2 (G5 - 784Hz)
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(783.99, now + 0.08);
+        gain2.gain.setValueAtTime(0.15, now + 0.08);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.08);
+        osc2.stop(now + 0.24);
+    } catch (e) {}
+}
+
+function playSiriCompletionChime() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const now = ctx.currentTime;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(659.25, now); // E5
+        osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.12); // C6
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+    } catch (e) {}
+}
+
 let currentAstraModeTheme = 'companion';
 
 const ORB_COLORS = {
@@ -109,8 +166,8 @@ function drawOrb() {
     const baseColor = ASTRA_MODE_COLORS[currentAstraModeTheme] || ORB_COLORS.idle;
     const color = (orbState === 'idle' || orbState === 'speaking') ? baseColor : (ORB_COLORS[orbState] || baseColor);
     const intensity = orbState === 'idle' ? 0.6 : 1.0;
-    const pulseSpeed = orbState === 'listening' ? 3 : orbState === 'thinking' ? 5 : 1.5;
-    const pulseAmp = orbState === 'thinking' ? 8 : orbState === 'listening' ? 5 : 3;
+    const pulseSpeed = orbState === 'listening' ? 3.5 : orbState === 'thinking' ? 5 : 1.5;
+    const pulseAmp = orbState === 'thinking' ? 8 : orbState === 'listening' ? 6 : 3;
 
     // Outer glow rings
     for (let i = 3; i >= 0; i--) {
@@ -120,6 +177,38 @@ function drawOrb() {
         orbCtx.arc(cx, cy, glowR + Math.sin(orbTime * 1.5 + i) * 3, 0, Math.PI * 2);
         orbCtx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
         orbCtx.fill();
+    }
+
+    // Siri Organic Fluid Waveform Layer (Active when Listening / Speaking / Thinking)
+    if (orbState === 'listening' || orbState === 'speaking' || orbState === 'thinking') {
+        const SiriColors = [
+            'rgba(0, 245, 255, ',    // Siri Cyan
+            'rgba(180, 0, 255, ',    // Siri Magenta / Purple
+            'rgba(0, 150, 255, ',    // Deep Electric Blue
+            'rgba(255, 255, 255, '   // Specular Highlight White
+        ];
+        const numWaves = 4;
+        for (let w = 0; w < numWaves; w++) {
+            orbCtx.beginPath();
+            const waveSpeed = orbState === 'listening' ? 3.5 : orbState === 'thinking' ? 5 : 2.5;
+            const wavePhase = orbTime * (waveSpeed + w * 0.5);
+            const amp = orbState === 'listening' ? 16 + w * 4 : orbState === 'speaking' ? 20 + w * 5 : 10;
+            
+            for (let a = 0; a <= Math.PI * 2; a += 0.04) {
+                const r = baseRadius + Math.sin(a * (3 + w) + wavePhase) * amp * Math.cos(a * 2 + orbTime);
+                const x = cx + Math.cos(a) * r;
+                const y = cy + Math.sin(a) * r;
+                if (a === 0) orbCtx.moveTo(x, y);
+                else orbCtx.lineTo(x, y);
+            }
+            orbCtx.closePath();
+            const alpha = (0.22 - w * 0.04) * intensity;
+            orbCtx.fillStyle = SiriColors[w % SiriColors.length] + alpha + ')';
+            orbCtx.fill();
+            orbCtx.strokeStyle = SiriColors[w % SiriColors.length] + (alpha * 1.6) + ')';
+            orbCtx.lineWidth = 1.5;
+            orbCtx.stroke();
+        }
     }
 
     // Rotating ring segments
@@ -177,6 +266,13 @@ function drawOrb() {
 drawOrb();
 
 function setOrbState(state) {
+    if (orbState !== state) {
+        if (state === 'listening') {
+            playSiriActivationChime();
+        } else if ((orbState === 'thinking' || orbState === 'speaking') && state === 'idle') {
+            playSiriCompletionChime();
+        }
+    }
     orbState = state;
     orbLabel.textContent = state.toUpperCase();
     orbLabel.className = state;
@@ -253,6 +349,8 @@ function addMessage(sender, text) {
 //  TEXT-TO-SPEECH (Browser SpeechSynthesis API)
 // ============================================================
 let voiceEnabled = true;
+let selectedVoiceURI = localStorage.getItem('jarvis_selected_voice') || '';
+let selectedVoiceRate = parseInt(localStorage.getItem('jarvis_voice_rate') || '175', 10);
 
 function speak(text) {
     if (!voiceEnabled || !text) return;
@@ -260,28 +358,94 @@ function speak(text) {
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 0.9;
+    utterance.rate = selectedVoiceRate / 175; // Normalize 175 wpm to 1.0 rate
+    utterance.pitch = 0.95;
     utterance.volume = 1;
 
-    // Try to pick a male English voice
     const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v =>
-        v.lang.startsWith('en') && v.name.toLowerCase().includes('male')
-    ) || voices.find(v =>
-        v.lang.startsWith('en') && v.name.toLowerCase().includes('david')
-    ) || voices.find(v => v.lang.startsWith('en'));
+    let chosenVoice = null;
 
-    if (preferred) utterance.voice = preferred;
+    if (selectedVoiceURI) {
+        chosenVoice = voices.find(v => v.voiceURI === selectedVoiceURI || v.name === selectedVoiceURI);
+    }
+    if (!chosenVoice) {
+        chosenVoice = voices.find(v =>
+            v.lang.startsWith('en') && v.name.toLowerCase().includes('male')
+        ) || voices.find(v =>
+            v.lang.startsWith('en') && v.name.toLowerCase().includes('david')
+        ) || voices.find(v => v.lang.startsWith('en'));
+    }
+
+    if (chosenVoice) utterance.voice = chosenVoice;
 
     utterance.onstart = () => setOrbState('speaking');
     utterance.onend = () => setOrbState('idle');
     window.speechSynthesis.speak(utterance);
 }
 
-// Load voices
-if ('speechSynthesis' in window) {
-    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+function initVoiceSelector() {
+    const voiceSelect = document.getElementById('voice-select');
+    const voiceSpeedRange = document.getElementById('voice-speed-range');
+    const voiceSpeedVal = document.getElementById('voice-speed-val');
+    const testVoiceBtn = document.getElementById('test-voice-btn');
+
+    if (voiceSpeedRange && voiceSpeedVal) {
+        voiceSpeedRange.value = selectedVoiceRate;
+        voiceSpeedVal.textContent = `${selectedVoiceRate} wpm`;
+
+        voiceSpeedRange.addEventListener('input', (e) => {
+            selectedVoiceRate = parseInt(e.target.value, 10);
+            voiceSpeedVal.textContent = `${selectedVoiceRate} wpm`;
+        });
+        voiceSpeedRange.addEventListener('change', (e) => {
+            selectedVoiceRate = parseInt(e.target.value, 10);
+            localStorage.setItem('jarvis_voice_rate', selectedVoiceRate);
+        });
+    }
+
+    function populateVoices() {
+        if (!('speechSynthesis' in window) || !voiceSelect) return;
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length === 0) return;
+
+        voiceSelect.innerHTML = '';
+        voices.forEach(v => {
+            const opt = document.createElement('option');
+            opt.value = v.voiceURI || v.name;
+            opt.textContent = `${v.name} (${v.lang})`;
+            if ((v.voiceURI && v.voiceURI === selectedVoiceURI) || v.name === selectedVoiceURI) {
+                opt.selected = true;
+            }
+            voiceSelect.appendChild(opt);
+        });
+
+        if (!voiceSelect.value && voiceSelect.options.length > 0) {
+            voiceSelect.selectedIndex = 0;
+            selectedVoiceURI = voiceSelect.value;
+        }
+    }
+
+    if ('speechSynthesis' in window) {
+        populateVoices();
+        window.speechSynthesis.onvoiceschanged = populateVoices;
+    }
+
+    if (voiceSelect) {
+        voiceSelect.addEventListener('change', (e) => {
+            selectedVoiceURI = e.target.value;
+            localStorage.setItem('jarvis_selected_voice', selectedVoiceURI);
+            const selectedOpt = voiceSelect.options[voiceSelect.selectedIndex];
+            if (selectedOpt) {
+                addMessage('JARVIS', `Voice persona updated to ${selectedOpt.textContent.split('(')[0].trim()}, sir.`);
+            }
+        });
+    }
+
+    if (testVoiceBtn) {
+        testVoiceBtn.addEventListener('click', () => {
+            speak("Voice system test. Hello sir, I am JARVIS, online and operational.");
+        });
+    }
 }
 
 
@@ -687,3 +851,4 @@ document.getElementById('platform-info').textContent = detectPlatform();
 //  INIT
 // ============================================================
 updateBrainStatus();
+initVoiceSelector();

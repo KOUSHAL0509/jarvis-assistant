@@ -61,6 +61,7 @@ except Exception:
 
 # Optional Imports
 try:
+    # pyrefly: ignore [missing-import]
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
@@ -73,6 +74,7 @@ except ImportError:
     HAS_REQUESTS = False
 
 try:
+    # pyrefly: ignore [missing-import]
     from openai import OpenAI
     HAS_OPENAI = True
 except ImportError:
@@ -90,12 +92,14 @@ openai_disabled = False
 MEMORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'user_memory.json')
 
 def load_user_memory():
-    """Load persistent user data (notes, todos, facts, profile)."""
+    """Load persistent user data (notes, todos, facts, profile, voice settings)."""
     default_data = {
         "user_name": "Koushal",
         "facts": [],
         "notes": [],
-        "todos": []
+        "todos": [],
+        "voice_id": None,
+        "voice_rate": 175
     }
     if not os.path.exists(MEMORY_FILE):
         save_user_memory(default_data)
@@ -117,6 +121,21 @@ def save_user_memory(data):
             json.dump(data, f, indent=2, ensure_ascii=False)
     except Exception as e:
         print(f"[!] Error saving user memory: {e}")
+
+def get_voice_settings():
+    mem = load_user_memory()
+    return {
+        "voice_id": mem.get("voice_id"),
+        "voice_rate": mem.get("voice_rate", 175)
+    }
+
+def save_voice_settings(voice_id=None, voice_rate=None):
+    mem = load_user_memory()
+    if voice_id is not None:
+        mem["voice_id"] = voice_id
+    if voice_rate is not None:
+        mem["voice_rate"] = int(voice_rate)
+    save_user_memory(mem)
 
 def get_user_name():
     mem = load_user_memory()
