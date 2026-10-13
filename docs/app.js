@@ -76,7 +76,7 @@
 //  ORB ANIMATION
 // ============================================================
 const orbCanvas = document.getElementById('orb-canvas');
-const orbCtx = orbCanvas.getContext('2d');
+const orbCtx = orbCanvas ? orbCanvas.getContext('2d') : null;
 const orbLabel = document.getElementById('orb-label');
 let orbState = 'idle';
 let orbTime = 0;
@@ -154,6 +154,7 @@ const ORB_COLORS = {
 };
 
 function drawOrb() {
+    if (!orbCanvas || !orbCtx) return;
     const W = orbCanvas.width;
     const H = orbCanvas.height;
     const cx = W / 2;
@@ -274,9 +275,37 @@ function setOrbState(state) {
         }
     }
     orbState = state;
-    orbLabel.textContent = state.toUpperCase();
-    orbLabel.className = state;
-    orbCanvas.className = state;
+    
+    // Update Iron Man stage and label
+    const stage = document.getElementById('orb-container');
+    if (stage) {
+        stage.className = `ironman-stage ${state}`;
+    }
+
+    if (orbLabel) {
+        const stateDescriptions = {
+            idle: 'STARK MARK LXXXV — IDLE',
+            listening: 'STARK MARK LXXXV — LISTENING',
+            thinking: 'STARK MARK LXXXV — COMPUTING',
+            speaking: 'STARK MARK LXXXV — TRANSMITTING'
+        };
+        orbLabel.textContent = stateDescriptions[state] || `STARK MARK LXXXV — ${state.toUpperCase()}`;
+        orbLabel.className = `ironman-label ${state}`;
+    }
+
+    if (orbCanvas) {
+        orbCanvas.className = `ironman-canvas ${state}`;
+    }
+
+    // Toggle voice bars active state
+    const voiceBars = document.getElementById('hud-voice-bars');
+    if (voiceBars) {
+        if (state === 'speaking' || state === 'listening') {
+            voiceBars.classList.add('active');
+        } else {
+            voiceBars.classList.remove('active');
+        }
+    }
 }
 
 
@@ -330,6 +359,7 @@ function formatMessageText(text) {
 }
 
 function addMessage(sender, text) {
+    if (!messagesContainer) return;
     const div = document.createElement('div');
     const isJarvis = sender.toLowerCase() === 'jarvis';
     div.className = `message ${isJarvis ? 'jarvis-msg' : 'user-msg'}`;
@@ -498,12 +528,10 @@ async function askGPT(query) {
 
 function updateBrainStatus() {
     const el = document.getElementById('brain-status');
-    if (apiKey) {
-        el.textContent = 'GPT-4o Ready';
-        el.style.color = 'var(--accent-green)';
-    } else {
-        el.textContent = 'Set API Key';
-        el.style.color = 'var(--accent-gold)';
+    if (el) {
+        // Keep System Info confidential as requested
+        el.innerHTML = `<span class="confidential-stamp">CLASSIFIED</span> ASTRA CORE // LVL 5`;
+        el.style.color = 'var(--accent-blue)';
     }
 }
 
@@ -852,3 +880,86 @@ document.getElementById('platform-info').textContent = detectPlatform();
 // ============================================================
 updateBrainStatus();
 initVoiceSelector();
+
+// ============================================================
+//  DRAWERS MANAGER (QUICK ACTIONS & SETTINGS OVERLAY POPUPS)
+// ============================================================
+(function initDrawers() {
+    const actionsBtn = document.getElementById('actions-toggle-btn');
+    const closeActionsBtn = document.getElementById('close-actions-btn');
+    const actionsPanel = document.getElementById('actions-panel');
+
+    const settingsBtn = document.getElementById('settings-toggle-btn');
+    const closeSettingsBtn = document.getElementById('close-settings-btn');
+    const settingsPanel = document.getElementById('info-panel');
+
+    function openDrawer(panel, btn) {
+        if (!panel) return;
+        panel.classList.add('open');
+        if (btn) btn.classList.add('active');
+    }
+
+    function closeDrawer(panel, btn) {
+        if (!panel) return;
+        panel.classList.remove('open');
+        if (btn) btn.classList.remove('active');
+    }
+
+    function toggleDrawer(panel, btn, otherPanel, otherBtn) {
+        if (!panel) return;
+        if (panel.classList.contains('open')) {
+            closeDrawer(panel, btn);
+        } else {
+            if (otherPanel) closeDrawer(otherPanel, otherBtn);
+            openDrawer(panel, btn);
+        }
+    }
+
+    if (actionsBtn && actionsPanel) {
+        actionsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDrawer(actionsPanel, actionsBtn, settingsPanel, settingsBtn);
+        });
+    }
+
+    if (settingsBtn && settingsPanel) {
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDrawer(settingsPanel, settingsBtn, actionsPanel, actionsBtn);
+        });
+    }
+
+    if (closeActionsBtn) {
+        closeActionsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeDrawer(actionsPanel, actionsBtn);
+        });
+    }
+
+    if (closeSettingsBtn) {
+        closeSettingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeDrawer(settingsPanel, settingsBtn);
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        if (actionsPanel && actionsPanel.classList.contains('open')) {
+            if (!actionsPanel.contains(e.target) && !actionsBtn.contains(e.target)) {
+                closeDrawer(actionsPanel, actionsBtn);
+            }
+        }
+        if (settingsPanel && settingsPanel.classList.contains('open')) {
+            if (!settingsPanel.contains(e.target) && !settingsBtn.contains(e.target)) {
+                closeDrawer(settingsPanel, settingsBtn);
+            }
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeDrawer(actionsPanel, actionsBtn);
+            closeDrawer(settingsPanel, settingsBtn);
+        }
+    });
+})();

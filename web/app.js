@@ -138,7 +138,7 @@ function playSiriCompletionChime() {
 //  ORB ANIMATION (Siri Waveform & Orb)
 // ============================================================
 const orbCanvas = document.getElementById('orb-canvas');
-const orbCtx = orbCanvas.getContext('2d');
+const orbCtx = orbCanvas ? orbCanvas.getContext('2d') : null;
 const orbLabel = document.getElementById('orb-label');
 let orbState = 'idle'; // idle, listening, thinking, speaking
 let orbTime = 0;
@@ -159,11 +159,12 @@ const ORB_COLORS = {
 };
 
 function drawOrb() {
+    if (!orbCanvas || !orbCtx) return;
     const W = orbCanvas.width;
     const H = orbCanvas.height;
     const cx = W / 2;
     const cy = H / 2;
-    const baseRadius = 65;
+    const baseRadius = 55;
 
     orbCtx.clearRect(0, 0, W, H);
     orbTime += 0.02;
@@ -182,38 +183,6 @@ function drawOrb() {
         orbCtx.arc(cx, cy, glowR + Math.sin(orbTime * 1.5 + i) * 3, 0, Math.PI * 2);
         orbCtx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
         orbCtx.fill();
-    }
-
-    // Siri Organic Fluid Waveform Layer (Active when Listening / Speaking / Thinking)
-    if (orbState === 'listening' || orbState === 'speaking' || orbState === 'thinking') {
-        const SiriColors = [
-            'rgba(0, 245, 255, ',    // Siri Cyan
-            'rgba(180, 0, 255, ',    // Siri Magenta / Purple
-            'rgba(0, 150, 255, ',    // Deep Electric Blue
-            'rgba(255, 255, 255, '   // Specular Highlight White
-        ];
-        const numWaves = 4;
-        for (let w = 0; w < numWaves; w++) {
-            orbCtx.beginPath();
-            const waveSpeed = orbState === 'listening' ? 3.5 : orbState === 'thinking' ? 5 : 2.5;
-            const wavePhase = orbTime * (waveSpeed + w * 0.5);
-            const amp = orbState === 'listening' ? 16 + w * 4 : orbState === 'speaking' ? 20 + w * 5 : 10;
-            
-            for (let a = 0; a <= Math.PI * 2; a += 0.04) {
-                const r = baseRadius + Math.sin(a * (3 + w) + wavePhase) * amp * Math.cos(a * 2 + orbTime);
-                const x = cx + Math.cos(a) * r;
-                const y = cy + Math.sin(a) * r;
-                if (a === 0) orbCtx.moveTo(x, y);
-                else orbCtx.lineTo(x, y);
-            }
-            orbCtx.closePath();
-            const alpha = (0.22 - w * 0.04) * intensity;
-            orbCtx.fillStyle = SiriColors[w % SiriColors.length] + alpha + ')';
-            orbCtx.fill();
-            orbCtx.strokeStyle = SiriColors[w % SiriColors.length] + (alpha * 1.6) + ')';
-            orbCtx.lineWidth = 1.5;
-            orbCtx.stroke();
-        }
     }
 
     // Rotating ring segments
@@ -262,17 +231,9 @@ function drawOrb() {
     orbCtx.fillStyle = coreGrad;
     orbCtx.fill();
 
-    // Inner ring
-    orbCtx.beginPath();
-    orbCtx.arc(cx, cy, baseRadius - 5, 0, Math.PI * 2);
-    orbCtx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${0.15 * intensity})`;
-    orbCtx.lineWidth = 1;
-    orbCtx.stroke();
-
     requestAnimationFrame(drawOrb);
 }
 drawOrb();
-
 
 // ============================================================
 //  SET ORB STATE (called from Python via eel)
@@ -286,9 +247,37 @@ function setOrbState(state) {
         }
     }
     orbState = state;
-    orbLabel.textContent = state.toUpperCase();
-    orbLabel.className = state;
-    orbCanvas.className = state;
+    
+    // Update Iron Man stage and label
+    const stage = document.getElementById('orb-container');
+    if (stage) {
+        stage.className = `ironman-stage ${state}`;
+    }
+
+    if (orbLabel) {
+        const stateDescriptions = {
+            idle: 'STARK MARK LXXXV — IDLE',
+            listening: 'STARK MARK LXXXV — LISTENING',
+            thinking: 'STARK MARK LXXXV — COMPUTING',
+            speaking: 'STARK MARK LXXXV — TRANSMITTING'
+        };
+        orbLabel.textContent = stateDescriptions[state] || `STARK MARK LXXXV — ${state.toUpperCase()}`;
+        orbLabel.className = `ironman-label ${state}`;
+    }
+
+    if (orbCanvas) {
+        orbCanvas.className = `ironman-canvas ${state}`;
+    }
+
+    // Toggle voice bars active state
+    const voiceBars = document.getElementById('hud-voice-bars');
+    if (voiceBars) {
+        if (state === 'speaking' || state === 'listening') {
+            voiceBars.classList.add('active');
+        } else {
+            voiceBars.classList.remove('active');
+        }
+    }
 }
 // Expose to Python
 if (typeof eel !== 'undefined') {
@@ -316,6 +305,7 @@ updateClock();
 const messagesContainer = document.getElementById('messages');
 
 function addMessage(sender, text) {
+    if (!messagesContainer) return;
     const div = document.createElement('div');
     const isJarvis = sender.toLowerCase() === 'jarvis';
     div.className = `message ${isJarvis ? 'jarvis-msg' : 'user-msg'}`;
@@ -387,22 +377,19 @@ if (typeof eel !== 'undefined') {
 //  UPDATE SYSTEM BAR (called from Python)
 // ============================================================
 function updateSystemBar(data) {
-    if (data.cpu !== undefined) {
-        document.getElementById('cpu-stat').textContent = `CPU: ${data.cpu}%`;
+    const cpuEl = document.getElementById('cpu-stat');
+    if (cpuEl && data.cpu !== undefined) {
+        cpuEl.textContent = `CPU: ${data.cpu}%`;
     }
-    if (data.battery !== undefined) {
-        document.getElementById('battery-stat').textContent = `BAT: ${data.battery}%`;
+    const batEl = document.getElementById('battery-stat');
+    if (batEl && data.battery !== undefined) {
+        batEl.textContent = `BAT: ${data.battery}%`;
     }
-    if (data.brain !== undefined) {
-        const brainEl = document.getElementById('brain-status');
-        brainEl.textContent = data.brain;
-        if (data.brain.includes('Online')) {
-            brainEl.style.color = 'var(--accent-green)';
-        } else if (data.brain.includes('Active')) {
-            brainEl.style.color = '#00c3ff';
-        } else {
-            brainEl.style.color = 'var(--accent-gold)';
-        }
+    const brainEl = document.getElementById('brain-status');
+    if (brainEl) {
+        // Keep System Info confidential as requested
+        brainEl.innerHTML = `<span class="confidential-stamp">CLASSIFIED</span> ASTRA CORE // LVL 5`;
+        brainEl.style.color = 'var(--accent-blue)';
     }
 }
 
@@ -631,3 +618,86 @@ window.addEventListener('load', async () => {
     }
     await initVoiceControls();
 });
+
+// ============================================================
+//  DRAWERS MANAGER (QUICK ACTIONS & SETTINGS OVERLAY POPUPS)
+// ============================================================
+(function initDrawers() {
+    const actionsBtn = document.getElementById('actions-toggle-btn');
+    const closeActionsBtn = document.getElementById('close-actions-btn');
+    const actionsPanel = document.getElementById('actions-panel');
+
+    const settingsBtn = document.getElementById('settings-toggle-btn');
+    const closeSettingsBtn = document.getElementById('close-settings-btn');
+    const settingsPanel = document.getElementById('info-panel');
+
+    function openDrawer(panel, btn) {
+        if (!panel) return;
+        panel.classList.add('open');
+        if (btn) btn.classList.add('active');
+    }
+
+    function closeDrawer(panel, btn) {
+        if (!panel) return;
+        panel.classList.remove('open');
+        if (btn) btn.classList.remove('active');
+    }
+
+    function toggleDrawer(panel, btn, otherPanel, otherBtn) {
+        if (!panel) return;
+        if (panel.classList.contains('open')) {
+            closeDrawer(panel, btn);
+        } else {
+            if (otherPanel) closeDrawer(otherPanel, otherBtn);
+            openDrawer(panel, btn);
+        }
+    }
+
+    if (actionsBtn && actionsPanel) {
+        actionsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDrawer(actionsPanel, actionsBtn, settingsPanel, settingsBtn);
+        });
+    }
+
+    if (settingsBtn && settingsPanel) {
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDrawer(settingsPanel, settingsBtn, actionsPanel, actionsBtn);
+        });
+    }
+
+    if (closeActionsBtn) {
+        closeActionsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeDrawer(actionsPanel, actionsBtn);
+        });
+    }
+
+    if (closeSettingsBtn) {
+        closeSettingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeDrawer(settingsPanel, settingsBtn);
+        });
+    }
+
+    document.addEventListener('click', (e) => {
+        if (actionsPanel && actionsPanel.classList.contains('open')) {
+            if (!actionsPanel.contains(e.target) && !actionsBtn.contains(e.target)) {
+                closeDrawer(actionsPanel, actionsBtn);
+            }
+        }
+        if (settingsPanel && settingsPanel.classList.contains('open')) {
+            if (!settingsPanel.contains(e.target) && !settingsBtn.contains(e.target)) {
+                closeDrawer(settingsPanel, settingsBtn);
+            }
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeDrawer(actionsPanel, actionsBtn);
+            closeDrawer(settingsPanel, settingsBtn);
+        }
+    });
+})();
